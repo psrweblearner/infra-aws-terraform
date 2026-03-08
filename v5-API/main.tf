@@ -1,40 +1,17 @@
-/*
-IMPORTANT OVERVIEW:
-- This file creates one connected stack:
-  EC2 (public subnet + Elastic IP) <-> RDS (private subnets) and EC2 -> S3 (IAM).
-- Connectivity is controlled by VPC/subnets/route tables, security groups, and IAM.
-
-NOT IMPORTANT:
-- Tags and naming conventions are optional for behavior, but useful for operations.
-*/
-
-/*
-SECTION: Base image + shared naming
-IMPORTANT:
-- AMI data source chooses the latest Ubuntu 22.04 image.
-- locals are reused by almost every resource for consistent names/tags.
-*/
-
-
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical (Ubuntu)
+  owners      = ["099720109477"]
 
   filter {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
 }
 
 locals {
-  name_prefix = "learning-v2"
+  name_prefix = "starter-kit"
   common_tags = {
-    Project = "learning-v2-connected"
+    Project = "starter-kit"
   }
 }
 
@@ -42,13 +19,7 @@ resource "random_id" "bucket_suffix" {
   byte_length = 4
 }
 
-/*
-SECTION: Network foundation (VPC, subnets, internet route)
-IMPORTANT:
-- Public subnet hosts EC2.
-- Private subnets host RDS through db subnet group.
-- Public route table + IGW enables internet access for EC2 and outbound package installs.
-*/
+
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
@@ -118,12 +89,6 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-/*
-SECTION: Security boundaries
-IMPORTANT:
-- ec2_sg allows inbound 22/80/443.
-- rds_sg allows MySQL (3306) only from ec2_sg, creating EC2 -> RDS trust.
-*/
 resource "aws_security_group" "ec2_sg" {
   name        = "${local.name_prefix}-ec2-sg"
   description = "EC2 access: SSH, HTTP, HTTPS"
@@ -190,16 +155,6 @@ resource "aws_security_group" "rds_sg" {
   })
 }
 
-/*
-SECTION: Database layer
-IMPORTANT:
-- RDS is private (`publicly_accessible = false`) and placed in private subnets.
-- db_subnet_group ties RDS to private_a/private_b.
-- EC2 connects using RDS endpoint and SG rules.
-
-LESS IMPORTANT FOR LEARNING:
-- backup_retention_period = 0 and skip_final_snapshot = true optimize easy rollback, not production safety.
-*/
 resource "aws_db_subnet_group" "main" {
   name       = "${local.name_prefix}-db-subnets"
   subnet_ids = [aws_subnet.private_a.id, aws_subnet.private_b.id]
@@ -230,12 +185,6 @@ resource "aws_db_instance" "app_db" {
   })
 }
 
-/*
-SECTION: Object storage layer
-IMPORTANT:
-- S3 bucket is private with public access blocked.
-- Bucket name is globally unique via random suffix.
-*/
 resource "aws_s3_bucket" "app_bucket" {
   bucket = "${var.bucket_prefix}-${random_id.bucket_suffix.hex}"
 
@@ -259,13 +208,6 @@ resource "aws_s3_bucket_versioning" "app_bucket_versioning" {
   }
 }
 
-/*
-SECTION: IAM for EC2 -> S3 (+ read-only RDS metadata)
-IMPORTANT:
-- EC2 role + instance profile are attached to the instance.
-- Policy grants scoped bucket access and rds:DescribeDBInstances.
-- This is the identity link that connects EC2 to S3 without hardcoded keys.
-*/
 resource "aws_iam_role" "ec2_role" {
   name = "${local.name_prefix}-ec2-role"
 
@@ -324,15 +266,6 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-/*
-SECTION: Compute layer
-IMPORTANT:
-- EC2 runs in the public subnet and receives IAM instance profile.
-- user_data writes runtime connection values (bucket + DB endpoint) to /home/ubuntu/app.env.
-
-LESS IMPORTANT:
-- key_name is optional; keep empty if you do not need SSH key access.
-*/
 resource "aws_instance" "app_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
@@ -341,28 +274,11 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
-  user_data = <<-EOT
-    #!/bin/bash
-    cat >/home/ubuntu/app.env <<EOF
-    APP_BUCKET=${aws_s3_bucket.app_bucket.bucket}
-    DB_HOST=${aws_db_instance.app_db.address}
-    DB_NAME=${var.db_name}
-    DB_USER=${var.db_username}
-    EOF
-    chown ubuntu:ubuntu /home/ubuntu/app.env
-  EOT
-
   tags = merge(local.common_tags, {
     Name = var.instance_name
   })
 }
 
-/*
-SECTION: Public address
-IMPORTANT:
-- EIP gives stable public IP.
-- aws_eip_association explicitly links EIP to EC2.
-*/
 resource "aws_eip" "app_eip" {
   domain = "vpc"
 
