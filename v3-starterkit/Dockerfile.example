@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY . .
+
+EXPOSE 3000
+
+# Keep sequelize-cli available for runtime migrations if your deploy script calls it.
+RUN npm install --no-save sequelize-cli pm2
+
+CMD ["pm2-runtime", "start", "ecosystem.config.js", "--env", "staging"]
