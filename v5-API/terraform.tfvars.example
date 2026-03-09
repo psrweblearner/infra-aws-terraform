@@ -1,0 +1,43 @@
+# AWS Deployment Configuration
+# Usage: Copy this file to terraform.tfvars and fill in the values
+
+# --- Required Variables ---
+
+# Project name/prefix for all resources
+name_prefix = "starterkit"
+
+# AWS Region to deploy resources
+aws_region = "ap-south-1"
+
+# Domain name for API
+domain_name = "api.aeonianit.in"
+
+# Database Configuration
+db_name     = "starterkit"
+db_username = "starterkit"
+
+# IMPORTANT: Set a strong password here or via environment variable
+db_password = "starterkit"
+
+# S3 Configuration
+bucket_prefix = "starterkit"
+
+
+# --- Optional Variables (Commented out use defaults) ---
+
+# VPC CIDR block
+# vpc_cidr = "10.20.0.0/16"
+
+# Subnet CIDRs
+# public_subnet_cidr     = "10.20.1.0/24"
+# private_subnet_a_cidr  = "10.20.2.0/24"
+# private_subnet_b_cidr  = "10.20.3.0/24"
+
+# EC2 Configuration
+# instance_type = "t3.micro"
+# instance_name = "" # Defaults to name_prefix-ec2 if empty
+# key_name      = "" # Existing AWS key pair name for SSH
+
+# RDS Configuration
+# db_instance_class    = "db.t3.micro"
+# db_allocated_storage = 20

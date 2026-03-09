@@ -1,5 +1,11 @@
+variable "name_prefix" {
+  description = "A prefix for resource naming to ensure uniqueness and organization."
+  type        = string
+  default     = "starter-kit"
+}
+
 variable "aws_region" {
-  description = "AWS region"
+  description = "The AWS region where resources will be deployed (e.g., us-east-1, ap-south-1)."
   type        = string
   default     = "ap-south-1"
 }
@@ -36,13 +42,13 @@ variable "instance_type" {
 }
 
 variable "instance_name" {
-  description = "EC2 Name tag"
+  description = "EC2 Name tag. If empty, will default to name_prefix-ec2."
   type        = string
-  default     = "learning-v2-ec2"
+  default     = ""
 }
 
 variable "key_name" {
-  description = "Existing AWS key pair name for SSH"
+  description = "The name of an existing AWS key pair for SSH access to the EC2 instance. Leave empty to use Session Manager or if no SSH access is needed."
   type        = string
   default     = ""
 }
@@ -60,7 +66,7 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "RDS master password"
+  description = "The master password for the RDS database instance. This should be provided via a .tfvars file or environment variable."
   type        = string
   sensitive   = true
 }
@@ -81,4 +87,10 @@ variable "bucket_prefix" {
   description = "Prefix used for S3 bucket naming"
   type        = string
   default     = "learning-v2-app"
+}
+
+variable "domain_name" {
+  description = "The domain name for the API (e.g., api.aeonianit.in)."
+  type        = string
+  default     = "api.aeonianit.in"
 }

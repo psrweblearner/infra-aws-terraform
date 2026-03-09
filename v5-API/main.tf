@@ -9,10 +9,22 @@ data "aws_ami" "ubuntu" {
 }
 
 locals {
-  name_prefix = "starter-kit"
+  name_prefix = var.name_prefix
   common_tags = {
-    Project = "starter-kit"
+    Project = var.name_prefix
   }
+}
+
+resource "tls_private_key" "main" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "generated_key" {
+  key_name   = "${local.name_prefix}-key"
+  public_key = tls_private_key.main.public_key_openssh
+
+  tags = local.common_tags
 }
 
 resource "random_id" "bucket_suffix" {
@@ -87,6 +99,24 @@ resource "aws_route_table" "public" {
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-private-rt"
+  })
+}
+
+resource "aws_route_table_association" "private_a" {
+  subnet_id      = aws_subnet.private_a.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_b" {
+  subnet_id      = aws_subnet.private_b.id
+  route_table_id = aws_route_table.private.id
 }
 
 resource "aws_security_group" "ec2_sg" {
@@ -269,13 +299,43 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 resource "aws_instance" "app_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
-  key_name               = var.key_name != "" ? var.key_name : null
+  key_name               = aws_key_pair.generated_key.key_name
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
+  user_data = <<-EOF
+              #!/<line_number>: bin/bash
+              apt-get update
+              apt-get install -y nginx certbot python3-certbot-nginx
+
+              # Configure Nginx for the domain
+              cat <<EOT > /etc/nginx/sites-available/app
+              server {
+                  listen 80;
+                  server_name ${var.domain_name};
+
+                  location / {
+                      proxy_pass http://localhost:3000; # Adjust if your app runs on a different port
+                      proxy_http_version 1.1;
+                      proxy_set_header Upgrade \$http_upgrade;
+                      proxy_set_header Connection 'upgrade';
+                      proxy_set_header Host \$host;
+                      proxy_cache_bypass \$http_upgrade;
+                  }
+              }
+              EOT
+
+              ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/
+              rm /etc/nginx/sites-enabled/default
+              systemctl restart nginx
+
+              # Note: Certbot SSL setup requires DNS to be pointed to this IP first.
+              # Use: sudo certbot --nginx -d ${var.domain_name} --non-interactive --agree-tos -m your-email@example.com
+              EOF
+
   tags = merge(local.common_tags, {
-    Name = var.instance_name
+    Name = var.instance_name != "" ? var.instance_name : "${local.name_prefix}-ec2"
   })
 }
 
