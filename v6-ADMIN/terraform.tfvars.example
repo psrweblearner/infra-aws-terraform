@@ -1,0 +1,13 @@
+# Usage: copy to terraform.tfvars and edit
+
+aws_region = "ap-south-1"
+domain_name = "admin.aeonianit.in"
+
+# IMPORTANT: restrict SSH to your IP (recommended)
+# allowed_ssh_cidr = "x.x.x.x/32"
+
+instance_type = "t3.micro"
+instance_name = "starter-kit-admin"
+
+# Reuse the same AWS key pair name from v5 (recommended). If you leave empty, this stack generates a new key.
+ssh_key_pair_name = "starterkit-key"

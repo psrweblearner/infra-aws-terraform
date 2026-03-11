@@ -304,10 +304,15 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
+  user_data_replace_on_change = true
   user_data = <<-EOF
-              #!/<line_number>: bin/bash
+              #!/bin/bash
               apt-get update
-              apt-get install -y nginx certbot python3-certbot-nginx
+              apt-get install -y docker.io docker-compose git nginx certbot python3-certbot-nginx
+
+              # Start and enable Docker
+              systemctl enable --now docker
+              usermod -aG docker ubuntu
 
               # Configure Nginx for the domain
               cat <<EOT > /etc/nginx/sites-available/app
@@ -316,7 +321,7 @@ resource "aws_instance" "app_server" {
                   server_name ${var.domain_name};
 
                   location / {
-                      proxy_pass http://localhost:3000; # Adjust if your app runs on a different port
+                      proxy_pass http://localhost:5000;
                       proxy_http_version 1.1;
                       proxy_set_header Upgrade \$http_upgrade;
                       proxy_set_header Connection 'upgrade';
@@ -327,11 +332,13 @@ resource "aws_instance" "app_server" {
               EOT
 
               ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/
-              rm /etc/nginx/sites-enabled/default
+              rm -f /etc/nginx/sites-enabled/default
               systemctl restart nginx
 
-              # Note: Certbot SSL setup requires DNS to be pointed to this IP first.
-              # Use: sudo certbot --nginx -d ${var.domain_name} --non-interactive --agree-tos -m your-email@example.com
+              # Automated SSL setup with Certbot
+              # Note: This requires DNS to be pointed to the Elastic IP first.
+              # If DNS is not ready, this command might fail but won't stop the script.
+              sudo certbot --nginx -d ${var.domain_name} --non-interactive --agree-tos -m webmaster@${var.domain_name} --redirect || true
               EOF
 
   tags = merge(local.common_tags, {

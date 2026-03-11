@@ -35,7 +35,7 @@ output "deployment_instructions" {
 1. Point your Cloudflare DNS (A Record) for ${var.domain_name} to ${aws_eip.app_eip.public_ip}.
 2. Save the 'ssh_private_key' output to a file named 'id_rsa' and run 'chmod 400 id_rsa'.
 3. SSH into the instance: ssh -i id_rsa ubuntu@${aws_eip.app_eip.public_ip}
-4. Once DNS propagates, run SSL setup: 
-   sudo certbot --nginx -d ${var.domain_name}
+4. Docker and Git are already installed. You can now run your Docker images on port 3000.
+5. SSL will be automatically configured by Certbot once DNS propagates to the Elastic IP.
 EOF
 }
