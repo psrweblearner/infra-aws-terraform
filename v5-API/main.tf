@@ -319,6 +319,7 @@ resource "aws_instance" "app_server" {
               server {
                   listen 80;
                   server_name ${var.domain_name};
+                  client_max_body_size 100M;
 
                   location / {
                       proxy_pass http://localhost:5000;

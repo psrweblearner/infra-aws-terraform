@@ -149,6 +149,7 @@ resource "aws_instance" "admin_server" {
               server {
                   listen 80;
                   server_name ${var.domain_name};
+                  client_max_body_size 100M;
 
                   location / {
                       proxy_pass http://localhost:${var.app_port};
@@ -186,4 +187,3 @@ resource "aws_eip_association" "admin_eip_assoc" {
   allocation_id = aws_eip.admin_eip.id
   instance_id   = aws_instance.admin_server.id
 }
-
